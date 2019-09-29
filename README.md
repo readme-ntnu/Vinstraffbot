@@ -1,5 +1,5 @@
 # Vinstraffbot
-Henter readme sine vinstraffer fra Google sheets og viser de i Slack
+Henter readme sine vinstraffer fra Google sheets og viser de i Slack.
 
 ## Hvordan fungerer det?
 Dette er et Google App Script som knytter seg til regnearket som holder på alle vinstraffene våre. Dette skriptet kalles av en kommando i Slack, ved hjelp av Slack API-et.
