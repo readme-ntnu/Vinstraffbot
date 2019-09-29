@@ -6,12 +6,12 @@ var END_ROW = 24;
 var TOTAL_ROW = 26;
 
 var Actions = {
-  checkAll: {
+  hentAlle: {
     requiredArgsCount: 0,
     helpText: [{ text: "Skriv `/vinstraffer` for å hente alle vinstraffene." }],
     execute: getVinstraffer
   },
-  check: {
+  hent: {
     requiredArgsCount: 1,
     helpText: [
       { text: "Skriv `/vinstraffer <dittnavn>` for å sjekke dine vinstraffer." }
