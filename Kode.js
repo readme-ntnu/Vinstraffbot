@@ -1,25 +1,23 @@
 var NAME_COL = 6;
 var NUM_COL = 7;
-var MUST_BRING_COL = 7;
+var MUST_BRING_COL = 8;
 var START_ROW = 5;
 var END_ROW = 24;
-var TOTAL_ROW = 26;
+var TOTAL_ROW = 25;
 
 var Actions = {
-  hentAlle: {
-    requiredArgsCount: 0,
-    helpText: [{ text: "Skriv `/vinstraffer` for å hente alle vinstraffene." }],
-    execute: getVinstraffer
-  },
   hent: {
     requiredArgsCount: 1,
     helpText: [
-      { text: "Skriv `/vinstraffer <dittnavn>` for å sjekke dine vinstraffer." }
+      {
+        text:
+          "Skriv `/vinstraffer hent <ditt navn>` for å sjekke dine vinstraffer, `/vinstraffer hent alle` for å hente alle."
+      }
     ],
     args: {
       0: [/[\s\S]*/, "Oops. Det navnet ble galt!"]
     },
-    execute: getBrukerVinstraffer
+    execute: getVinstraffer
   }
 };
 
@@ -29,27 +27,22 @@ function doPost(e) {
     req = queryStringToJSON(e.postData.contents);
     /* Extract the action from the request text */
     var action = getAction(req);
-    if (!actionIsValid(action)) throw "Hi. You sent an invalid command";
+    if (!actionIsValid(action)) throw "Du sendte en ugyldig kommando.";
     /* Extract the action arguments from the request text */
     var args = getActionArgs(req);
-    args.forEach(function(arg, index) {
-      if (!actionParamIsValid(arg, index, action)) {
+    args.forEach(function(arg) {
+      if (!actionParamIsValid(arg, action)) {
         throw actions[action].args[index][1];
       }
     });
     /* The result of the handler for any action is assigned to resText */
-    var resText = actions[action].execute(args);
+    var resText = Actions[action].execute(args);
     /* The response is composed and sent here */
     var res = composeResponse(resText);
     return quickResponse(res);
   } catch (error) {
-    Logger.log("Ny feil: " + error + " fra " + e.postData.contents);
-    if (!req || !req["text"]) {
-      return quickResponse(
-        composeResponse("Hei! Du kjørte meg", actions.check.helpText)
-      );
-    }
-    var errorMessage = composeResponse(error, actions.check.helpText);
+    sendLogs("Ny feil: " + error + " fra " + e.postData.contents);
+    var errorMessage = composeResponse(error, Actions.hent.helpText);
     return quickResponse(errorMessage);
   }
 }
@@ -79,20 +72,16 @@ function actionIsValid(action) {
 
 function getActionArgs(req) {
   var payload = req["text"];
-  var payloadObjects = payload.split("+", 2);
-  var action = payloadObjects[0];
+  var payloadObjects = payload.split("+");
   if (!payloadObjects[1]) {
-    throw "Oups. Du skrev en ufullstendig kommando. Skriv /vinstraffer " +
-      action +
-      " for autocomplete-valg";
+    throw "Oups. Du skrev en ufullstendig kommando. Skriv /vinstraffer for autocomplete-valg";
   }
-  var argCount = Actions[action].requiredArgsCount;
-  var args = payloadObjects[1].split("+", argCount);
+  var args = payloadObjects.slice(1);
   return args;
 }
 
-function actionParamIsValid(param, paramIndex, action) {
-  var pattern = Actions[action].args[paramIndex][0];
+function actionParamIsValid(param, action) {
+  var pattern = Actions[action].args[0][0];
   return pattern.test(param);
 }
 
@@ -108,18 +97,18 @@ function findValueInSheet(key, _sheet) {
       break;
     }
   }
-  if (!selectedRow) throw captialize(key) + " har ingen vinstraffer!";
+  if (!selectedRow) return null;
   return [values[selectedRow][NUM_COL], values[selectedRow][MUST_BRING_COL]];
 }
 
-function findAllVinstraffer(_sheet) {
+function getAllVinstraffer(_sheet) {
   var sheet = _sheet;
   var dataRange = sheet.getDataRange();
   var values = dataRange.getValues();
-  var result = [];
+  var result = [["Dette er vinstraffene som er gyldige akkurat nå:\n"]];
   for (var i = START_ROW; i < END_ROW; i++) {
     var name = values[i][NAME_COL];
-    if (name !== "") {
+    if (name !== "" && values[i][NUM_COL] !== 0) {
       var straffer = values[i][NUM_COL];
       var min_staffer = values[i][MUST_BRING_COL];
 
@@ -127,40 +116,55 @@ function findAllVinstraffer(_sheet) {
         name +
           ": " +
           straffer +
-          "Vinstraffer\nMå ha med minst " +
+          conjugate(straffer) +
+          "\nMå ha med minst " +
           min_staffer +
-          "+\n"
+          "\n\n"
       ]);
     }
   }
   result.push([
     "\nTotalt er det " +
       values[TOTAL_ROW][NUM_COL] +
-      "vinstraffer.\nDet skal tas med minst " +
+      conjugate(values[TOTAL_ROW][NUM_COL]) +
+      ".\nDet skal tas med minst " +
       values[TOTAL_ROW][MUST_BRING_COL] +
-      " på neste taco! :tada::tada:"
+      " på neste taco! :tada: :wine_glass: :taco: :tada:"
   ]);
   return result;
 }
 
 function getBrukerVinstraffer(args) {
-  var name = args[0];
+  var name = capitalize(args[0]);
+  if (args.length > 1) {
+    for (var i = 1; i < args.length; i++) {
+      name += " " + capitalize(args[i]);
+    }
+  }
   var result = findValueInSheet(name, SpreadsheetApp.getActiveSheet());
-  if (!numberOnList) {
-    throw captialize(name) + "har ingen vinstraffer. Gratulerer!";
+  if (!result || result[0] === 0) {
+    return name + " har ingen vinstraffer. Gratulerer!";
   }
   return (
-    "Du har " +
+    name +
+    " har " +
     result[0] +
-    " vinstraffer, og må ta med minst " +
+    conjugate(result[0]) +
+    ", og må ta med minst " +
     result[1] +
-    "på neste taco."
+    " på neste taco."
   );
 }
 
-function getVinstraffer() {
-  var result = findAllVinstraffer();
-  return result.join("");
+function getVinstraffer(args) {
+  var result = undefined;
+  if (args[0] === "alle") {
+    var result = getAllVinstraffer(SpreadsheetApp.getActiveSheet());
+    result = result.join("");
+  } else {
+    result = getBrukerVinstraffer(args);
+  }
+  return result;
 }
 
 /* This function helps us to deal with sending advanced Slack messages
@@ -168,7 +172,7 @@ function getVinstraffer() {
  */
 function composeResponse(text, attachments) {
   var res = {
-    response_type: "ephemeral",
+    response_type: "in_channel",
     text: text,
     attachments: attachments || []
   };
@@ -183,6 +187,22 @@ function quickResponse(res) {
   return JSONOutput;
 }
 
-function captialize(word) {
-  return word.charAt(0).toUpperCase() + word.slice(1);
+function capitalize(word) {
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+
+function conjugate(vinstraffer) {
+  if (vinstraffer <= 1) {
+    return " vinstraff";
+  } else {
+    return " vinstraffer";
+  }
+}
+
+function sendLogs(error) {
+  Logger.log(error);
+  var recipient = Session.getEffectiveUser().getEmail();
+  var subject = "Error from Vinstraffbot";
+  var body = Logger.getLog();
+  MailApp.sendEmail(recipient, subject, body);
 }
