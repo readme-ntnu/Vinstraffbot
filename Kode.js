@@ -3,7 +3,7 @@ var NUM_COL = 7;
 var MUST_BRING_COL = 8;
 var START_ROW = 5;
 var END_ROW = 28;
-var TOTAL_ROW = 29;
+var TOTAL_ROW = 28;
 
 var Actions = {
   hent: {
